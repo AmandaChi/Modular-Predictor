@@ -1,2 +1,2 @@
 # Modular-Predictor
-Inspire from keras2cpp
+Inspire by keras2cpp
