@@ -32,6 +32,7 @@ public:
 	virtual void set_data(vector<vector<float>> const &) { throw "not implemented"; };
 	virtual void set_data(vector<float> const &) { throw "not implemented"; };
 	virtual void read_from_file(const string &fname) {};
+	virtual void read_line(ifstream &fin) {};
 	virtual int get_data_dim(void) const { return 0; }
 	virtual vector<float> const & get_1d() const { throw "not implemented"; };
 	virtual vector<vector<float>> const & get_2d() const { throw "not implemented"; };
@@ -42,21 +43,22 @@ public:
 
 class Predictor::DataChunk1D: public Predictor::DataChunk {
 public:
-	vector<float> f;
-	vector<float> const & get_1d() const { return f; }
-	void set_data(vector<float> const & d) { f = d; };
+	vector<float> data;
+	vector<float> const & get_1d() const { return data; }
+	void set_data(vector<float> const & d) { data = d; };
 	int get_data_dim(void) const { return 1; }
 	void show_name() {
-		cout << "DataChunk1D " << f.size() << endl;
+		cout << "DataChunk1D " << data.size() << endl;
 	}
 	void show_value()
 	{
 		cout << "DataChunk1D values:" << endl;
-		for (unsigned i = 0; i < f.size(); i++)
-			cout << f[i] << " ";
+		for (unsigned i = 0; i < data.size(); i++)
+			cout << data[i] << " ";
 		cout << endl;
 	}
 	void read_from_file(const string &fname) {};
+	void read_line(ifstream &fin);
 };
 
 class Predictor::DataChunk2D : public Predictor::DataChunk {
@@ -154,12 +156,12 @@ public:
 	LayerConv1D() : Layer("Conv1D") {}
 	void load_weights(ifstream &fin);
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
-	vector<vector<vector<float>>> m_kernals;
+	vector<vector<vector<float>>> m_filters;
 	vector<float> m_bias;
 	string m_border_mode;
-	int m_kernels_cnt;
-	int m_depth;
-	int m_rows;
+	int m_filter_length;
+	int m_nb_filter;
+	int m_input_dim;
 };
 
 class Predictor::LayerDense : public Predictor::Layer {

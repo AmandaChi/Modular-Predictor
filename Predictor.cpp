@@ -1,5 +1,5 @@
 #include "Predictor.h"
-
+#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
@@ -25,6 +25,17 @@ void missing_activation_impl(const string &act) {
 	exit(1);
 }
 
+void DataChunk1D::read_line(ifstream &fin)
+{
+	string line;
+	getline(fin, line);
+	stringstream ss(line);
+	string buf;
+	while (ss >> buf)
+		data.push_back(atof(buf.c_str()));
+	DataChunk *out = new DataChunk1D();
+
+}
 
 void DataChunk2D::read_from_file(const string &fname)
 {
@@ -144,8 +155,44 @@ DataChunk* LayerActivation::compute_output(DataChunk* dc) {
 	return dc;
 }
 //Conv1D
+void LayerConv1D::load_weights(ifstream &fin) {
+	fin >> m_border_mode;
+	fin >> m_filter_length >> m_input_dim >> m_nb_filter;
+	for (int i = 0; i < m_filter_length; i++)
+	{
+		vector<vector<float>> tmp_filter;
+		for (int j = 0; j < m_input_dim; j++)
+		{
+			vector<float> tmp_single_row = read_1d_array(fin, m_nb_filter);
+			tmp_filter.push_back(tmp_single_row);
+		}
+		m_filters.push_back(tmp_filter);
+	}
+	m_bias = read_1d_array(fin, m_nb_filter);
+}
 
-
+DataChunk* LayerConv1D::compute_output(DataChunk* dc)
+{
+	unsigned int st_x = (m_filter_length - 1)/2;
+	auto const & vec = dc->get_2d();
+	size_t size_x = (m_border_mode == "valid") ? vec.size() - 2 * st_x : vec.size();
+	vector<vector<float>> ret(size_x, vector<float>(m_nb_filter, 0));
+	for(int i = 0; i < m_filter_length; i++) //Loop over filter length
+		for (int j = 0; j < m_nb_filter; j++) //Loop over filter
+			for (unsigned int k = 0; k < size_x; k++) //Loop over output vec
+				for (int l = 0; l < m_input_dim; l++) //Loop over input dim
+				{
+					int tmp = (m_border_mode == "valid") ? k + i : k + i - st_x;
+					if (tmp > 0)
+						ret[k][j] += vec[tmp][l] * m_filters[i][l][j];
+				}
+	for (unsigned int i = 0; i < size_x; i++)
+		for (int j = 0; j < m_nb_filter; j++)
+			ret[i][j] += m_bias[j];
+	DataChunk *out = new DataChunk2D();
+	out->set_data(ret);
+	return out;
+}
 //MaxPooling : May not be right, easist version
 DataChunk* LayerMaxPooling::compute_output(DataChunk* dc)
 {
