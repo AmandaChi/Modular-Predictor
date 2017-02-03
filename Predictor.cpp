@@ -1,9 +1,5 @@
 #include "Predictor.h"
-#include <sstream>
-#include <iostream>
-#include <fstream>
-#include <algorithm>
-#include <math.h>
+
 using namespace std;
 using namespace Predictor;
 
@@ -64,7 +60,7 @@ void DataChunk3D::read_from_file(const string &fname)
 }
 
 //Embedding Layer
-void LayerEmbedding::load_weights(ifstream &fin) {
+void LayerEmbedding::load_weights(ifstream &fin, ifstream &confin) {
 	fin >> m_vocab_size >> m_dimension;
 	for (int i = 0; i < m_vocab_size; i++)
 	{
@@ -84,7 +80,7 @@ DataChunk* LayerEmbedding::compute_output(DataChunk* dc) {
 }
 
 //Dense Layer
-void LayerDense::load_weights(ifstream &fin) { // Dimensions: input * output
+void LayerDense::load_weights(ifstream &fin, ifstream &confin) { // Dimensions: input * output
 	fin >> m_input_cnt >> m_output_cnt;
 	for (int i = 0; i < m_input_cnt; i++)
 	{
@@ -147,6 +143,14 @@ DataChunk* LayerActivation::compute_output(DataChunk* dc) {
 			out->set_data(y);
 			return out;
 		}
+		else if (m_activation_type == "sigmoid")
+		{
+			for (unsigned int i = 0; i < y.size(); i++)
+				y[i] = 1.0/(1+exp(-y[i]));
+			DataChunk *out = new DataChunk1D();
+			out->set_data(y);
+			return out;
+		}
 		else{
 			missing_activation_impl(m_activation_type);
 		}
@@ -155,8 +159,8 @@ DataChunk* LayerActivation::compute_output(DataChunk* dc) {
 	return dc;
 }
 //Conv1D
-void LayerConv1D::load_weights(ifstream &fin) {
-	fin >> m_border_mode;
+void LayerConv1D::load_weights(ifstream &fin, ifstream &confin) {
+	confin >> m_border_mode;
 	fin >> m_filter_length >> m_input_dim >> m_nb_filter;
 	for (int i = 0; i < m_filter_length; i++)
 	{
@@ -183,7 +187,7 @@ DataChunk* LayerConv1D::compute_output(DataChunk* dc)
 				for (int l = 0; l < m_input_dim; l++) //Loop over input dim
 				{
 					int tmp = (m_border_mode == "valid") ? k + i : k + i - st_x;
-					if (tmp > 0)
+					if (tmp >= 0)
 						ret[k][j] += vec[tmp][l] * m_filters[i][l][j];
 				}
 	for (unsigned int i = 0; i < size_x; i++)
@@ -199,7 +203,7 @@ DataChunk* LayerMaxPooling::compute_output(DataChunk* dc)
 	if (dc->get_data_dim() == 2)
 	{
 		vector<vector<float>> y = dc->get_2d();
-		vector<float> tmpMax;
+		vector<float> tmpMax(y[0].size());
 		for (unsigned int i = 0; i < y.size(); i++)
 			for (unsigned int j = 0; j < y[0].size(); j++)
 				if (i == 0 || y[i][j] > tmpMax[j])
@@ -225,45 +229,52 @@ vector<float> Model::compute_output(DataChunk *dc)
 	for (unsigned int l = 0; l < m_layers.size(); l++)
 	{
 		out = m_layers[l]->compute_output(in);
+//		out->show_name();
+//		out->show_value();
 		if (in != dc) delete in;
 		in = out;
+
 	}
 	vector<float> output = out->get_1d();
 	delete out;
 	return output;
 }
 
-void Model::load_weights(const string &input_config) {
+bool Model::load_weights(const string &input_config) {
 	if (m_verbose) cout << "Reading model from " << input_config << endl;
 	ifstream fin(input_config.c_str());
 	fin >> m_layers_cnt;
 	string layer_type = "";
 	int tmp_layerNo;
-	int tmp_layerNumber;
+	int layer_number;
 	if (m_verbose) cout << "Layers count " << m_layers_cnt << endl;
 	for (int layer = 0; layer < m_layers_cnt; layer++)
 	{
-		fin >> tmp_layerNo >> layer_type >> tmp_layerNumber;
-		if (m_verbose) cout << "Layer " << tmp_layerNo << " " << layer_type << " " << tmp_layerNumber << endl;
+		fin >> tmp_layerNo >> layer_type >> layer_number;
+		if (m_verbose) cout << "Layer " << tmp_layerNo << " " << layer_type << " " << layer_number << endl;
 		Layer *l = 0L;
-		ifstream layerfile(layer_type + "_" + to_string(tmp_layerNumber) + ".param");
-		if (layer_type == "Convolution1D")
+		string layerFileName = layer_type + "_" + to_string(layer_number) + ".txt";
+		ifstream layerfile(layerFileName);
+		if (layerfile && m_verbose)
+			cout << "Reading Layer" << tmp_layerNo << " From " << layerFileName << endl;
+		if (layer_type == "convolution1d")
 			l = new LayerConv1D();
-		else if (layer_type == "Dense")
+		else if (layer_type == "dense")
 			l = new LayerDense();
-		else if (layer_type == "Activation")
+		else if (layer_type == "activation")
 			l = new LayerActivation();
-		else if (layer_type == "Maxpooling")
+		else if (layer_type == "maxpooling1d")
 			l = new LayerMaxPooling();
-		else if (layer_type == "Embedding")
+		else if (layer_type == "embedding")
 			l = new LayerEmbedding();
 		if (l == 0L) {
 			cout << "Layer is empty, maybe it is not defined? Cannot define network. " << endl;
-			return;
+			return false;
 		}
-		l->load_weights(layerfile);
+		l->load_weights(layerfile,fin);
 		m_layers.push_back(l);
 		layerfile.close();
 	}
 	fin.close();
+	return true;
 }

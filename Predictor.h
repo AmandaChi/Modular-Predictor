@@ -5,6 +5,8 @@
 #include <vector>
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <math.h>
 
 using namespace std;
 namespace Predictor
@@ -118,7 +120,7 @@ public:
 
 class Predictor::Layer {
 public:
-	virtual void load_weights(ifstream &fin) = 0;
+	virtual void load_weights(ifstream &fin, ifstream &confin) = 0;
 	virtual Predictor::DataChunk* compute_output(Predictor::DataChunk*) = 0;
 	Layer(string name) : m_name(name) {}
 	virtual ~Layer() {}
@@ -129,7 +131,7 @@ public:
 class Predictor::LayerEmbedding : public Predictor::Layer {
 public:
 	LayerEmbedding() : Layer("Embedding") {};
-	void load_weights(ifstream &fin);
+	void load_weights(ifstream &fin, ifstream &confin);
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 	vector<vector<float>> m_embs;
 	int m_vocab_size;
@@ -138,15 +140,15 @@ public:
 class Predictor::LayerMaxPooling : public Predictor::Layer {
 public:
 	LayerMaxPooling() : Layer("MaxPooling") {};
-	void load_weights(ifstream &fin) { fin >> m_pool; }
+	void load_weights(ifstream &fin, ifstream &confin) { }
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
-	int m_pool;
+	//int m_pool;
 };
 
 class Predictor::LayerActivation : public Predictor::Layer {
 public:
 	LayerActivation() : Layer("Activation") {};
-	void load_weights(ifstream &fin) { fin >> m_activation_type; }
+	void load_weights(ifstream &fin, ifstream &confin) { confin >> m_activation_type; }
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 	string m_activation_type;
 };
@@ -154,7 +156,7 @@ public:
 class Predictor::LayerConv1D : public Predictor::Layer {
 public:
 	LayerConv1D() : Layer("Conv1D") {}
-	void load_weights(ifstream &fin);
+	void load_weights(ifstream &fin, ifstream &confin);
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 	vector<vector<vector<float>>> m_filters;
 	vector<float> m_bias;
@@ -167,7 +169,7 @@ public:
 class Predictor::LayerDense : public Predictor::Layer {
 public:
 	LayerDense() : Layer("Dense") {}
-	void load_weights(ifstream &fin);
+	void load_weights(ifstream &fin, ifstream &confin);
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 	vector<vector<float>> m_weights; //input, output
 	vector<float> m_bias;
@@ -185,7 +187,7 @@ public:
 	}
 	vector<float> compute_output(Predictor::DataChunk *dc);
 private:
-	void load_weights(const string &input_config);
+	bool load_weights(const string &input_config);
 	int m_layers_cnt;
 	vector<Predictor::Layer *> m_layers;
 	bool m_verbose;
