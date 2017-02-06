@@ -1,5 +1,6 @@
 #include "Predictor.h"
 
+
 using namespace std;
 using namespace Predictor;
 
@@ -21,13 +22,16 @@ void missing_activation_impl(const string &act) {
 	exit(1);
 }
 
-void DataChunk1D::read_line(ifstream &fin)
+void DataChunk1D::read_line(ifstream &fin,int field)
 {
 	string line;
 	getline(fin, line);
 	stringstream ss(line);
+	for (int i = 0; i <= field; i++)
+		getline(ss, line, '\t');
+	stringstream ss_field(line);
 	string buf;
-	while (ss >> buf)
+	while (ss_field >> buf)
 		data.push_back(atof(buf.c_str()));
 	DataChunk *out = new DataChunk1D();
 
@@ -217,6 +221,19 @@ DataChunk* LayerMaxPooling::compute_output(DataChunk* dc)
 
 }
 
+DataChunk* LayerFlatten::compute_output(DataChunk* dc)
+{
+	if (dc->get_data_dim() == 2)
+	{
+		DataChunk *out = new DataChunk1D();
+		out->set_data(dc->get_2d()[0]);
+		return out;
+	}
+	else
+	{
+		throw "Data dim not supported.";
+	}
+}
 //Whole Model
 Model::Model(const string &input_fname, bool verbose) :m_verbose(verbose) {
 	load_weights(input_fname);
@@ -233,8 +250,8 @@ vector<float> Model::compute_output(DataChunk *dc)
 //		out->show_value();
 		if (in != dc) delete in;
 		in = out;
-
 	}
+
 	vector<float> output = out->get_1d();
 	delete out;
 	return output;
@@ -267,6 +284,8 @@ bool Model::load_weights(const string &input_config) {
 			l = new LayerMaxPooling();
 		else if (layer_type == "embedding")
 			l = new LayerEmbedding();
+		else if (layer_type == "flatten")
+			l = new LayerFlatten();
 		if (l == 0L) {
 			cout << "Layer is empty, maybe it is not defined? Cannot define network. " << endl;
 			return false;

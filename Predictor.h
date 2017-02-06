@@ -19,6 +19,7 @@ namespace Predictor
 	class Layer;
 	class LayerEmbedding;
 	class LayerMaxPooling;
+	class LayerFlatten;
 	class LayerActivation;
 	class LayerConv1D;
 	class LayerDense;
@@ -34,7 +35,7 @@ public:
 	virtual void set_data(vector<vector<float>> const &) { throw "not implemented"; };
 	virtual void set_data(vector<float> const &) { throw "not implemented"; };
 	virtual void read_from_file(const string &fname) {};
-	virtual void read_line(ifstream &fin) {};
+	virtual void read_line(ifstream &fin,int field) {};
 	virtual int get_data_dim(void) const { return 0; }
 	virtual vector<float> const & get_1d() const { throw "not implemented"; };
 	virtual vector<vector<float>> const & get_2d() const { throw "not implemented"; };
@@ -60,7 +61,7 @@ public:
 		cout << endl;
 	}
 	void read_from_file(const string &fname) {};
-	void read_line(ifstream &fin);
+	void read_line(ifstream &fin,int field);
 };
 
 class Predictor::DataChunk2D : public Predictor::DataChunk {
@@ -143,6 +144,13 @@ public:
 	void load_weights(ifstream &fin, ifstream &confin) { }
 	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 	//int m_pool;
+};
+
+class Predictor::LayerFlatten : public Predictor::Layer {
+public:
+	LayerFlatten() : Layer("Flatten") {};
+	void load_weights(ifstream &fin, ifstream &confin) {}
+	Predictor::DataChunk* compute_output(Predictor::DataChunk*);
 };
 
 class Predictor::LayerActivation : public Predictor::Layer {
